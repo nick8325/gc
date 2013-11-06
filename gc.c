@@ -41,7 +41,6 @@ void gc_enter(void) {
 }
 
 void gc_leave(void) {
-  printf("%d -> ", nroots);
   while (nroots > 0 && roots[nroots-1])
     nroots--;
   if (nroots > 0)
@@ -128,7 +127,6 @@ void * gc_alloc(pool_t * pool) {
   struct node * free = pool->free;
   if (!free) return NULL;
   pool->free = free->next;
-  gc_root(free);
   return free;
 }
 

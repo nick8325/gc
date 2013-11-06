@@ -32,6 +32,20 @@ void gc_root(void * ptr);
 void gc_enter(void);
 void gc_leave(void);
 void gc_trace(void * ptr);
+#define GC_ENTER(...) do { \
+  void *gc_objs[] = {__VA_ARGS__}; \
+  int i; \
+  gc_enter(); \
+  for (i = 0; i < sizeof gc_objs / sizeof gc_objs[0]; i++) \
+    gc_root(gc_objs[i]); } while(0)
+#define GC_LEAVE(...) do { \
+  void *gc_objs[] = {__VA_ARGS__}; \
+  int i; \
+  gc_leave(); \
+  for (i = 0; i < sizeof gc_objs / sizeof gc_objs[0]; i++) \
+    gc_root(gc_objs[i]); } while(0)
+#define GC_RETURN(x) do { GC_LEAVE(x); return (x); } while(0)
+#define GC_RESET(...) do { GC_LEAVE(); GC_ENTER(__VA_ARGS__); } while(0)
 size_t gc(void);
 
 #endif
