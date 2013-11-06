@@ -22,20 +22,30 @@ static int nroots = 0;
 static int maxroots = 0;
 void ** roots = 0;
 
-void gc_push_root(void * root) {
+static void gc_root_1(void * root) {
   if (nroots == maxroots) {
     if (maxroots) maxroots *= 2;
     else maxroots = 1;
-    roots = realloc(roots, maxroots);
+    roots = realloc(roots, maxroots*sizeof(void *));
     if (!roots) fatal("out of memory for roots");
   }
   roots[nroots++] = root;
 }
 
-void gc_pop_root(void * root) {
-  if (nroots == 0) fatal("gc_pop_root mismatch (nroots == 0)");
-  nroots--;
-  if (roots[nroots] != root) fatal("gc_pop_root mismatch");
+void gc_root(void * root) {
+  if (root) gc_root_1(root);
+}
+
+void gc_enter(void) {
+  gc_root_1(NULL);
+}
+
+void gc_leave(void) {
+  printf("%d -> ", nroots);
+  while (nroots > 0 && roots[nroots-1])
+    nroots--;
+  if (nroots > 0)
+    nroots--;
 }
 
 #define PAGE_SIZE 4096
@@ -118,6 +128,7 @@ void * gc_alloc(pool_t * pool) {
   struct node * free = pool->free;
   if (!free) return NULL;
   pool->free = free->next;
+  gc_root(free);
   return free;
 }
 

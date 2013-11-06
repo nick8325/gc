@@ -28,8 +28,9 @@ typedef struct pool {
       })
 
 void * gc_alloc(pool_t * pool);
-void gc_push_root(void * ptr);
-void gc_pop_root(void * ptr);
+void gc_root(void * ptr);
+void gc_enter(void);
+void gc_leave(void);
 void gc_trace(void * ptr);
 size_t gc(void);
 

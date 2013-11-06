@@ -46,27 +46,22 @@ void print_out(struct value * value) {
 }
 
 int main() {
-  struct value *test = pair(NULL, NULL); gc_push_root(test);
-  test->pair.a = leaf(1);
-  struct value *p1 = pair(NULL, NULL);
-  test->pair.b = p1;
-  p1->pair.a = leaf(2);
-  struct value *p2 = pair(NULL, NULL);
-  p1->pair.b = p2;
-  p2->pair.a = leaf(3);
-  struct value *p3 = pair(NULL, NULL);
-  p2->pair.b = p3;
-  p3->pair.a = leaf(4);
-  struct value *p4 = pair(NULL, NULL);
-  p3->pair.b = p4;
-  p4->pair.a = leaf(5);
+  gc_enter();
+
+  gc_enter();
+  struct value *test = pair(leaf(1), pair(leaf(2), pair(leaf(3), pair(leaf(4), pair(leaf(5), NULL)))));
+  gc_leave();
+
+  gc_root(test);
   
   print_out(test);
   printf("%ld\n", gc());
+  gc_enter();
   inc_all(test);
+  gc_leave();
   printf("%ld\n", gc());
   print_out(test);
-  gc_pop_root(test);
+  gc_leave();
   printf("%ld\n", gc());
   return 0;
 }
