@@ -58,6 +58,7 @@ int main() {
 
   struct value *test = pair(leaf(1), pair(leaf(2), pair(leaf(3), pair(leaf(4), pair(leaf(5), NULL)))));
   GC_RESET(test);
+  printf("%ld\n", gc());
   
   print_out(test);
   printf("%ld\n", gc());

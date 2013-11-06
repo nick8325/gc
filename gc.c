@@ -87,6 +87,7 @@ static size_t gc_reclaim_page(pool_t * pool, struct page * page) {
     i++;
   }
   pool->free = next;
+  pool->nfree += result;
   return result;
 }
 
@@ -98,64 +99,54 @@ static void gc_new_page(pool_t * pool) {
   page->pool = pool;
   page->next = pool->pages;
   pool->pages = page;
+  pool->npages++;
   gc_reclaim_page(pool, page);
-}
-
-static size_t gc_pages(pool_t * pool) {
-  size_t i = 0;
-  struct page * page = pool->pages;
-  while (page) {
-    i++;
-    page = page->next;
-  }
-  return i;
-}
-
-static void gc_reserve(pool_t * pool) {
-  if (pool->free) return;
-  size_t freed = gc();
-  if (!pool->free || gc_pages(pool) >= 2 * freed / PAGE_SIZE) {
-    size_t pages = gc_pages(pool);
-    size_t i;
-    for (i = 0; i < pages+1; i++)
-      gc_new_page(pool);
-  }
-}
-
-void * gc_alloc(pool_t * pool) {
-  gc_reserve(pool);
-  struct node * free = pool->free;
-  if (!free) return NULL;
-  pool->free = free->next;
-  return free;
 }
 
 static pool_t * pools;
 
-static size_t gc_used(pool_t * pool) {
-  size_t result = 0;
-  struct node * free = pool->free;
-  while (free) {
-    result++;
-    free = free->next;
+static void gc_reserve(pool_t * pool) {
+  if (pool->free) return;
+  gc();
+  if (pool->nfree <= 0.3 * pool->npages * (DATA_SIZE / pool->size)) {
+    size_t npages = pool->npages;
+    size_t i;
+    for (i = 0; i < npages+1; i++)
+      gc_new_page(pool);
   }
-  return result;
+}
+
+static void gc_init(pool_t * pool) {
+  if (pool->next || pool == pools) return;
+  pool->next = pools;
+  pools = pool;
+}
+
+void * gc_alloc(pool_t * pool) {
+  gc_init(pool);
+  gc_reserve(pool);
+  struct node * free = pool->free;
+  if (!free) return NULL;
+  pool->free = free->next;
+  pool->nfree--;
+  gc_root(free);
+  return free;
 }
 
 static size_t gc_trim(pool_t * pool) {
-  size_t old = gc_used(pool);
+  size_t nfree = pool->nfree;
+  pool->nfree = 0;
   pool->free = NULL;
   pool->next = NULL;
 
   size_t result = 0;
-
   struct page * page = pool->pages;
   while (page) {
     result += gc_reclaim_page(pool, page);
     page = page->next;
   }
   
-  return (result - old) * pool->size;
+  return result - nfree;
 }
 
 void gc_trace(void * ptr) {
@@ -166,11 +157,6 @@ void gc_trace(void * ptr) {
   struct pool * pool = page -> pool;
   size_t idx = ofs / pool->size;
 
-  if (!pool->next && pool != pools) {
-    pool->next = pools;
-    pools = pool;
-  }
-  
   if (!bit_test(page->bitmap, idx)) {
     bit_set(page->bitmap, idx);
     pool->tracer(ptr);
@@ -178,13 +164,25 @@ void gc_trace(void * ptr) {
 }
 
 size_t gc() {
-  size_t i, result = 0;
-  pools = NULL;
+  struct pool * pool = pools;
+  while (pool) {
+    struct page * page = pool->pages;
+    while(page) {
+      memset(page->bitmap, 0, BITMAP_SIZE);
+      page = page->next;
+    }
+    pool = pool->next;
+  }
+
+  size_t i;
   for (i = 0; i < nroots; i++)
     gc_trace(roots[i]);
-  while (pools) {
-    result += gc_trim(pools);
-    pools = pools->next;
+
+  size_t result = 0;
+  pool = pools;
+  while (pool) {
+    result += gc_trim(pool) * pool->size;
+    pool = pool->next;
   }
   return result;
 }

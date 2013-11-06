@@ -13,6 +13,7 @@ typedef struct pool {
   struct node * free;
   struct page * pages;
   struct pool * next;
+  size_t nfree, npages;
 } pool_t;
 
 #define ALIGN(size)                           \
@@ -24,7 +25,7 @@ typedef struct pool {
   ((struct pool) {                            \
     ALIGN(sizeof(type)),                      \
     (tracer_t) (trace),                       \
-    NULL, NULL                                \
+    NULL, NULL, 0, 0                          \
       })
 
 void * gc_alloc(pool_t * pool);
