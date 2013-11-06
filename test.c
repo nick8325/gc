@@ -47,9 +47,10 @@ void inc_all(struct value * value) {
 void print_out(struct value * value) {
   GC_ENTER();
   while(value) {
-    printf("%d \n", value->pair.a->value);
+    printf("%d ", value->pair.a->value);
     value = value->pair.b;
   }
+  printf("\n");
   GC_LEAVE();
 }
 
@@ -58,14 +59,14 @@ int main() {
 
   struct value *test = pair(leaf(1), pair(leaf(2), pair(leaf(3), pair(leaf(4), pair(leaf(5), NULL)))));
   GC_RESET(test);
-  printf("%ld\n", gc());
+  printf("%ld bytes freed\n", gc());
   
   print_out(test);
-  printf("%ld\n", gc());
+  printf("%ld bytes freed\n", gc());
   inc_all(test);
-  printf("%ld\n", gc());
+  printf("%ld bytes freed\n", gc());
   print_out(test);
   GC_LEAVE();
-  printf("%ld\n", gc());
+  printf("%ld bytes freed\n", gc());
   return 0;
 }

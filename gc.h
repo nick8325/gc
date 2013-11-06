@@ -49,5 +49,6 @@ void gc_trace(void * ptr);
 #define GC_RETURN(x) do { GC_LEAVE(x); return (x); } while(0)
 #define GC_RESET(...) do { GC_LEAVE(); GC_ENTER(__VA_ARGS__); } while(0)
 size_t gc(void);
+void gc_stats(void);
 
 #endif

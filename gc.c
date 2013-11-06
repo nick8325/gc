@@ -20,14 +20,29 @@ struct node {
 
 static int nroots = 0;
 static int maxroots = 0;
+static size_t roots_size = 0;
 void ** roots = 0;
 
+#define PAGE_SIZE 4096
+
+static void * page_alloc(size_t size) {
+  return mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+}
+
 static void gc_root_1(void * root) {
+  if (!roots) {
+    roots = page_alloc(PAGE_SIZE);
+    if (!roots) fatal("no memory for roots");
+    roots_size = PAGE_SIZE;
+    maxroots = PAGE_SIZE / sizeof(void *);
+  }
   if (nroots == maxroots) {
-    if (maxroots) maxroots *= 2;
-    else maxroots = 1;
-    roots = realloc(roots, maxroots*sizeof(void *));
-    if (!roots) fatal("out of memory for roots");
+    void ** new_roots = page_alloc(roots_size * 2);
+    if (!new_roots) fatal("out of memory for roots");
+    memcpy(new_roots, roots, nroots * sizeof(void *));
+    munmap(roots, roots_size);
+    roots_size *= 2;
+    maxroots = roots_size / sizeof(void *);
   }
   roots[nroots++] = root;
 }
@@ -47,7 +62,6 @@ void gc_leave(void) {
     nroots--;
 }
 
-#define PAGE_SIZE 4096
 #define BITMAP_SIZE (PAGE_SIZE/8)
 #define DATA_SIZE (PAGE_SIZE - BITMAP_SIZE - sizeof(struct page *) - sizeof(struct pool *))
 
@@ -93,7 +107,7 @@ static size_t gc_reclaim_page(pool_t * pool, struct page * page) {
 
 static void gc_new_page(pool_t * pool) {
   assert(sizeof(struct page) == PAGE_SIZE);
-  struct page * page = mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+  struct page * page = page_alloc(PAGE_SIZE);
   if (page == MAP_FAILED) fatal("mmap failed");
   /* page->bitmap is already zeroed */
   page->pool = pool;
@@ -164,6 +178,7 @@ void gc_trace(void * ptr) {
 }
 
 size_t gc() {
+  gc_stats();
   struct pool * pool = pools;
   while (pool) {
     struct page * page = pool->pages;
@@ -184,5 +199,26 @@ size_t gc() {
     result += gc_trim(pool) * pool->size;
     pool = pool->next;
   }
+  gc_stats();
   return result;
+}
+
+int gc_frames() {
+  int result = 0;
+  int i;
+  for (i = 0; i < nroots; i++)
+    if (!roots[i])
+      result++;
+  return result;
+}
+
+void gc_stats() {
+  printf("%d roots in %d stack frames\n", nroots, gc_frames());
+
+  struct pool * pool = pools;
+  while(pool) {
+    printf("Pool (size %ld): %ld pages, %ld free objects\n",
+           pool->size, pool->npages, pool->nfree);
+    pool = pool->next;
+  }
 }
