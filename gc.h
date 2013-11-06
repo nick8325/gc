@@ -29,6 +29,7 @@ typedef struct pool {
 
 void * gc_alloc(pool_t * pool);
 void gc_root(void * ptr);
+#define GC_PIN(ptr) (gc_root(ptr), (ptr))
 void gc_enter(void);
 void gc_leave(void);
 void gc_trace(void * ptr);

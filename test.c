@@ -36,21 +36,21 @@ struct value * leaf(int x) {
 }
 
 void inc_all(struct value * value) {
+  GC_ENTER();
   while(value) {
-    GC_ENTER(value);
     value->pair.a = leaf(value->pair.a->value+1);
     value = value->pair.b;
-    GC_LEAVE(value);
   }
+  GC_LEAVE();
 }
 
 void print_out(struct value * value) {
+  GC_ENTER();
   while(value) {
-    GC_ENTER(value);
     printf("%d \n", value->pair.a->value);
     value = value->pair.b;
-    GC_LEAVE(value);
   }
+  GC_LEAVE();
 }
 
 int main() {
