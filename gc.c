@@ -14,53 +14,48 @@ static void fatal(const char * msg, ...) {
   abort();
 }
 
-struct node {
-  struct node * next;
-};
-
-static int nroots = 0;
-static int maxroots = 0;
+int gc_nroots = 0;
+int gc_maxroots = 0;
 static size_t roots_size = 0;
-void ** roots = 0;
+void ** gc_roots = 0;
 
 #define PAGE_SIZE 4096
 
 static void * page_alloc(size_t size) {
-  return mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+  void * ptr = mmap(0, size*2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+  if (ptr == MAP_FAILED) return 0;
+  void * aligned = (void *)ALIGN_TO((size_t)ptr, size);
+  munmap(ptr, aligned-ptr);
+  munmap(aligned+size, ptr+size-aligned);
+  return aligned;
 }
 
-static void gc_root_1(void * root) {
-  if (nroots == maxroots) {
-    if (!roots) {
-      roots = page_alloc(PAGE_SIZE);
-      if (!roots) fatal("no memory for roots");
-      roots_size = PAGE_SIZE;
-      maxroots = PAGE_SIZE / sizeof(void *);
-    }
-    void ** new_roots = page_alloc(roots_size * 2);
-    if (!new_roots) fatal("out of memory for roots");
-    memcpy(new_roots, roots, nroots * sizeof(void *));
-    munmap(roots, roots_size);
-    roots = new_roots;
-    roots_size *= 2;
-    maxroots = roots_size / sizeof(void *);
+void gc_expand_roots() {
+  if (!gc_roots) {
+    gc_roots = page_alloc(PAGE_SIZE);
+    if (!gc_roots) fatal("no memory for roots");
+    roots_size = PAGE_SIZE;
+    gc_maxroots = PAGE_SIZE / sizeof(void *);
   }
-  roots[nroots++] = root;
-}
-
-void gc_root(void * root) {
-  if (root) gc_root_1(root);
+  void ** new_roots = page_alloc(roots_size * 2);
+  if (!new_roots) fatal("out of memory for roots");
+  memcpy(new_roots, gc_roots, gc_nroots * sizeof(void *));
+  munmap(gc_roots, roots_size);
+  gc_roots = new_roots;
+  roots_size *= 2;
+  gc_maxroots = roots_size / sizeof(void *);
 }
 
 void gc_enter(void) {
-  gc_root_1(NULL);
+  if (gc_nroots == gc_maxroots) gc_expand_roots();
+  gc_roots[gc_nroots++] = NULL;
 }
 
 void gc_leave(void) {
-  while (nroots > 0 && roots[nroots-1])
-    nroots--;
-  if (nroots > 0)
-    nroots--;
+  while (gc_nroots > 0 && gc_roots[gc_nroots-1])
+    gc_nroots--;
+  if (gc_nroots > 0)
+    gc_nroots--;
 }
 
 #define BITMAP_SIZE (PAGE_SIZE/8)
@@ -109,7 +104,7 @@ static size_t gc_reclaim_page(pool_t * pool, struct page * page) {
 static void gc_new_page(pool_t * pool) {
   assert(sizeof(struct page) == PAGE_SIZE);
   struct page * page = page_alloc(PAGE_SIZE);
-  if (page == MAP_FAILED) fatal("mmap failed");
+  if (!page) fatal("mmap failed");
   /* page->bitmap is already zeroed */
   page->pool = pool;
   page->next = pool->pages;
@@ -137,7 +132,7 @@ static void gc_init(pool_t * pool) {
   pools = pool;
 }
 
-void * gc_alloc(pool_t * pool) {
+void * gc_alloc_slow(pool_t * pool) {
   gc_init(pool);
   gc_reserve(pool);
   struct node * free = pool->free;
@@ -205,11 +200,11 @@ size_t gc() {
   }
 
   size_t i;
-  size_t old_nroots = nroots;
-  for (i = 0; i < nroots; i++)
+  size_t old_gc_nroots = gc_nroots;
+  for (i = 0; i < gc_nroots; i++)
     /* OBS gc_start_trace can add new roots */
-    gc_start_trace(roots[i]);
-  nroots = old_nroots;
+    gc_start_trace(gc_roots[i]);
+  gc_nroots = old_gc_nroots;
 
   size_t result = 0;
   pool = pools;
@@ -225,8 +220,8 @@ size_t gc() {
 int gc_frames() {
   int result = 0;
   int i;
-  for (i = 0; i < nroots; i++)
-    if (!roots[i])
+  for (i = 0; i < gc_nroots; i++)
+    if (!gc_roots[i])
       result++;
   return result;
 }
@@ -234,7 +229,7 @@ int gc_frames() {
 void gc_stats() {
   return;
   printf("%d collections so far\n", ncollects);
-  printf("%d roots in %d stack frames\n", nroots, gc_frames());
+  printf("%d roots in %d stack frames\n", gc_nroots, gc_frames());
 
   struct pool * pool = pools;
   while(pool) {

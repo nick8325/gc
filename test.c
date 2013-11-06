@@ -84,6 +84,7 @@ int main() {
   print_out(test);
   GC_LEAVE();
   printf("%ld bytes freed\n", gc());
-  big_test();
+  int i;
+  for (i = 0; i < 10; i++) big_test();
   return 0;
 }

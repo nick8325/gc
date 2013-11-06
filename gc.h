@@ -28,8 +28,31 @@ typedef struct pool {
     NULL, NULL, 0, 0                          \
       })
 
-void * gc_alloc(pool_t * pool);
-void gc_root(void * ptr);
+extern int gc_nroots;
+extern int gc_maxroots;
+extern void ** gc_roots;
+void gc_expand_roots(void);
+static inline void gc_root(void * ptr) {
+  if (!ptr) return;
+  if (gc_nroots == gc_maxroots) gc_expand_roots();
+  gc_roots[gc_nroots++] = ptr;
+}
+
+struct node {
+  struct node * next;
+};
+
+void * gc_alloc_slow(pool_t * pool);
+static inline void * gc_alloc(pool_t * pool) {
+  struct node * free = pool->free;
+  if (free) {
+    pool->free = free->next;
+    pool->nfree--;
+    gc_root(free);
+    return free;
+  } else return gc_alloc_slow(pool);
+}
+
 #define GC_PIN(ptr) (gc_root(ptr), (ptr))
 void gc_enter(void);
 void gc_leave(void);
