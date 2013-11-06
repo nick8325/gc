@@ -30,17 +30,18 @@ static void * page_alloc(size_t size) {
 }
 
 static void gc_root_1(void * root) {
-  if (!roots) {
-    roots = page_alloc(PAGE_SIZE);
-    if (!roots) fatal("no memory for roots");
-    roots_size = PAGE_SIZE;
-    maxroots = PAGE_SIZE / sizeof(void *);
-  }
   if (nroots == maxroots) {
+    if (!roots) {
+      roots = page_alloc(PAGE_SIZE);
+      if (!roots) fatal("no memory for roots");
+      roots_size = PAGE_SIZE;
+      maxroots = PAGE_SIZE / sizeof(void *);
+    }
     void ** new_roots = page_alloc(roots_size * 2);
     if (!new_roots) fatal("out of memory for roots");
     memcpy(new_roots, roots, nroots * sizeof(void *));
     munmap(roots, roots_size);
+    roots = new_roots;
     roots_size *= 2;
     maxroots = roots_size / sizeof(void *);
   }
@@ -163,6 +164,13 @@ static size_t gc_trim(pool_t * pool) {
   return result - nfree;
 }
 
+static void ** stack_base;
+
+static void gc_start_trace(void * ptr) {
+  stack_base = &ptr;
+  gc_trace(ptr);
+}
+
 void gc_trace(void * ptr) {
   if (!ptr) return;
   size_t addr = (size_t)ptr;
@@ -172,10 +180,17 @@ void gc_trace(void * ptr) {
   size_t idx = ofs / pool->size;
 
   if (!bit_test(page->bitmap, idx)) {
-    bit_set(page->bitmap, idx);
-    pool->tracer(ptr);
+    if (&ptr - stack_base >= 0x10000 || stack_base - &ptr >= 0x10000) {
+      /* stack has got too deep - add the pointer as a new root */
+      gc_root(ptr);
+    } else {
+      bit_set(page->bitmap, idx);
+      pool->tracer(ptr);
+    }
   }
 }
+
+static int ncollects = 0;
 
 size_t gc() {
   gc_stats();
@@ -190,8 +205,11 @@ size_t gc() {
   }
 
   size_t i;
+  size_t old_nroots = nroots;
   for (i = 0; i < nroots; i++)
-    gc_trace(roots[i]);
+    /* OBS gc_start_trace can add new roots */
+    gc_start_trace(roots[i]);
+  nroots = old_nroots;
 
   size_t result = 0;
   pool = pools;
@@ -199,6 +217,7 @@ size_t gc() {
     result += gc_trim(pool) * pool->size;
     pool = pool->next;
   }
+  ncollects++;
   gc_stats();
   return result;
 }
@@ -213,6 +232,8 @@ int gc_frames() {
 }
 
 void gc_stats() {
+  return;
+  printf("%d collections so far\n", ncollects);
   printf("%d roots in %d stack frames\n", nroots, gc_frames());
 
   struct pool * pool = pools;

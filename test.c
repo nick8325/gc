@@ -54,6 +54,22 @@ void print_out(struct value * value) {
   GC_LEAVE();
 }
 
+void big_test() {
+  GC_ENTER();
+  struct value *test = NULL;
+  int i;
+  for (i = 0; i < 1000000; i++) {
+    test = pair(leaf(i), test);
+    GC_RESET(test);
+  }
+  printf("%ld bytes freed\n", gc());
+  inc_all(test);
+  printf("%ld bytes freed\n", gc());
+
+  GC_LEAVE();
+  printf("%ld bytes freed\n", gc());
+}
+
 int main() {
   GC_ENTER();
 
@@ -68,5 +84,6 @@ int main() {
   print_out(test);
   GC_LEAVE();
   printf("%ld bytes freed\n", gc());
+  big_test();
   return 0;
 }
