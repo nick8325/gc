@@ -47,7 +47,7 @@ void gc_expand_roots() {
   gc_maxroots = roots_size / sizeof(void *);
 }
 
-#define BITMAP_SIZE (PAGE_SIZE/8)
+#define BITMAP_SIZE (PAGE_SIZE/(8*sizeof(void *)))
 #define DATA_SIZE (PAGE_SIZE - BITMAP_SIZE - sizeof(struct page *) - sizeof(struct pool *))
 
 struct page {
