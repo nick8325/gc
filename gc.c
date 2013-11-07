@@ -14,6 +14,7 @@ static void fatal(const char * msg, ...) {
   abort();
 }
 
+int gc_oldnroots = 0;
 int gc_nroots = 0;
 int gc_maxroots = 0;
 static size_t roots_size = 0;
@@ -198,7 +199,10 @@ size_t gc() {
   size_t old_gc_nroots = gc_nroots;
   for (i = 0; i < gc_nroots; i++)
     /* OBS gc_start_trace can add new roots */
-    gc_start_trace(gc_roots[i]);
+    if (gc_roots[i])
+      gc_start_trace(gc_roots[i]);
+    else
+      i++; /* skip stack frame */
   gc_nroots = old_gc_nroots;
 
   size_t result = 0;
@@ -224,7 +228,7 @@ int gc_frames() {
 void gc_stats() {
   return;
   printf("%d collections so far\n", ncollects);
-  printf("%d roots in %d stack frames\n", gc_nroots, gc_frames());
+  printf("%d roots in %d stack frames\n", gc_nroots - gc_frames(), gc_frames());
 
   struct pool * pool = pools;
   while(pool) {

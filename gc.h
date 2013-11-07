@@ -29,6 +29,7 @@ typedef struct pool {
       })
 
 extern int gc_nroots;
+extern int gc_oldnroots;
 extern int gc_maxroots;
 extern void ** gc_roots;
 void gc_expand_roots(void);
@@ -55,15 +56,16 @@ static inline void * gc_alloc(pool_t * pool) {
 
 #define GC_PIN(ptr) (gc_root(ptr), (ptr))
 static inline void gc_enter(void) {
-  if (gc_nroots == gc_maxroots) gc_expand_roots();
-  gc_roots[gc_nroots++] = NULL;
+  if (gc_nroots + 1 >= gc_maxroots) gc_expand_roots();
+  gc_roots[gc_nroots] = NULL;
+  gc_roots[gc_nroots+1] = (void *)(size_t) gc_oldnroots;
+  gc_oldnroots = gc_nroots;
+  gc_nroots += 2;
 }
 
 static inline void gc_leave(void) {
-  while (gc_nroots > 0 && gc_roots[gc_nroots-1])
-    gc_nroots--;
-  if (gc_nroots > 0)
-    gc_nroots--;
+  gc_nroots = gc_oldnroots;
+  if (gc_nroots) gc_oldnroots = (size_t) gc_roots[gc_nroots+1];
 }
 
 void gc_trace(void * ptr);
