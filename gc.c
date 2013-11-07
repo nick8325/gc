@@ -37,14 +37,15 @@ void gc_expand_roots() {
     if (!gc_roots) fatal("no memory for roots");
     roots_size = PAGE_SIZE;
     gc_maxroots = PAGE_SIZE / sizeof(void *);
+  } else {
+    void ** new_roots = page_alloc(roots_size * 2);
+    if (!new_roots) fatal("out of memory for roots");
+    memcpy(new_roots, gc_roots, gc_nroots * sizeof(void *));
+    munmap(gc_roots, roots_size);
+    gc_roots = new_roots;
+    roots_size *= 2;
+    gc_maxroots = roots_size / sizeof(void *);
   }
-  void ** new_roots = page_alloc(roots_size * 2);
-  if (!new_roots) fatal("out of memory for roots");
-  memcpy(new_roots, gc_roots, gc_nroots * sizeof(void *));
-  munmap(gc_roots, roots_size);
-  gc_roots = new_roots;
-  roots_size *= 2;
-  gc_maxroots = roots_size / sizeof(void *);
 }
 
 #define BITMAP_SIZE (PAGE_SIZE/(8*sizeof(void *)))
@@ -226,14 +227,15 @@ int gc_frames() {
 }
 
 void gc_stats() {
-  return;
   printf("%d collections so far\n", ncollects);
   printf("%d roots in %d stack frames\n", gc_nroots - gc_frames(), gc_frames());
 
   struct pool * pool = pools;
   while(pool) {
-    printf("Pool (size %ld): %ld pages, %ld free objects\n",
-           pool->size, pool->npages, pool->nfree);
+    printf("Pool (size %ld): %ld pages (%ld bytes, %ld overhead), %ld free objects (%ld bytes)\n",
+           pool->size, pool->npages, pool->npages * PAGE_SIZE,
+           pool->npages * (PAGE_SIZE - DATA_SIZE),
+           pool->nfree, pool->nfree * pool->size);
     pool = pool->next;
   }
 }
