@@ -18,7 +18,7 @@ void trace_value(struct value * value) {
 
 pool_t value_pool = NEW_POOL(struct value, trace_value);
 
-struct value * pair(struct value * a, struct value * b) {
+static inline struct value * pair(struct value * a, struct value * b) {
   GC_ENTER();
   struct value * result = gc_alloc(&value_pool);
   result->leaf = false;
@@ -27,7 +27,7 @@ struct value * pair(struct value * a, struct value * b) {
   GC_RETURN(result);
 }
 
-struct value * leaf(int x) {
+static inline struct value * leaf(int x) {
   GC_ENTER();
   struct value * result = gc_alloc(&value_pool);
   result->leaf = true;
