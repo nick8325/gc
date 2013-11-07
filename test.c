@@ -19,7 +19,7 @@ void trace_value(struct value * value) {
 pool_t value_pool = NEW_POOL(struct value, trace_value);
 
 struct value * pair(struct value * a, struct value * b) {
-  GC_ENTER(a, b);
+  GC_ENTER();
   struct value * result = gc_alloc(&value_pool);
   result->leaf = false;
   result->pair.a = a;
@@ -45,13 +45,11 @@ void inc_all(struct value * value) {
 }
 
 void print_out(struct value * value) {
-  GC_ENTER();
   while(value) {
     printf("%d ", value->pair.a->value);
     value = value->pair.b;
   }
   printf("\n");
-  GC_LEAVE();
 }
 
 void big_test() {
@@ -61,8 +59,8 @@ void big_test() {
   int i;
   for (i = 0; i < 1000000; i++) {
     test = pair(leaf(i), test);
-    GC_RESET(test);
   }
+  GC_RESET(test);
   // printf("%ld bytes freed\n", gc());
   printf("copy long list... ");
   inc_all(test);
