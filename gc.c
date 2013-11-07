@@ -171,8 +171,15 @@ void gc_trace(void * ptr) {
   size_t addr = (size_t)ptr;
   size_t ofs = addr % PAGE_SIZE;
   struct page * page = (struct page *)(addr - ofs);
-  struct pool * pool = page -> pool;
-  size_t idx = ofs / pool->size;
+  struct pool * pool = page->pool;
+  size_t size = pool->size;
+  size_t idx;
+#define CASE(n) else if (size <= n) idx = ofs / ALIGN(n)
+  if(false);
+  CASE(4); CASE(8); CASE(16); CASE(32); CASE(48); CASE(64); CASE(80); CASE(96);
+  CASE(112); CASE(128); CASE(144); CASE(160); CASE(176); CASE(192); CASE(208);
+  CASE(224); CASE(240); CASE(256);
+  else idx = ofs / ALIGN(size);
 
   if (!bit_test(page->bitmap, idx)) {
     if (&ptr - stack_base >= 0x10000 || stack_base - &ptr >= 0x10000) {
