@@ -54,8 +54,18 @@ static inline void * gc_alloc(pool_t * pool) {
 }
 
 #define GC_PIN(ptr) (gc_root(ptr), (ptr))
-void gc_enter(void);
-void gc_leave(void);
+static inline void gc_enter(void) {
+  if (gc_nroots == gc_maxroots) gc_expand_roots();
+  gc_roots[gc_nroots++] = NULL;
+}
+
+static inline void gc_leave(void) {
+  while (gc_nroots > 0 && gc_roots[gc_nroots-1])
+    gc_nroots--;
+  if (gc_nroots > 0)
+    gc_nroots--;
+}
+
 void gc_trace(void * ptr);
 #define GC_ENTER(...) do { \
   void *gc_objs[] = {__VA_ARGS__}; \
