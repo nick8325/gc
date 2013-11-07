@@ -55,6 +55,7 @@ void print_out(struct value * value) {
 }
 
 void big_test() {
+  printf("Make long list... ");
   GC_ENTER();
   struct value *test = NULL;
   int i;
@@ -62,12 +63,14 @@ void big_test() {
     test = pair(leaf(i), test);
     GC_RESET(test);
   }
-  printf("%ld bytes freed\n", gc());
+  // printf("%ld bytes freed\n", gc());
+  printf("copy long list... ");
   inc_all(test);
-  printf("%ld bytes freed\n", gc());
+  printf("done.\n");
+  // printf("%ld bytes freed\n", gc());
 
   GC_LEAVE();
-  printf("%ld bytes freed\n", gc());
+  // printf("%ld bytes freed\n", gc());
 }
 
 int main() {
@@ -85,6 +88,7 @@ int main() {
   GC_LEAVE();
   printf("%ld bytes freed\n", gc());
   int i;
-  for (i = 0; i < 10; i++) big_test();
+  for (i = 0; i < 100; i++) big_test();
+  printf("%ld bytes freed\n", gc());
   return 0;
 }
