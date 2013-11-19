@@ -23,9 +23,9 @@ void ** gc_roots = 0;
 #define PAGE_SIZE 4096
 
 static void * page_alloc(size_t size) {
-  void * ptr = mmap(0, size*2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+  char * ptr = mmap(0, size*2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
   if (ptr == MAP_FAILED) return 0;
-  void * aligned = (void *)ALIGN_TO((size_t)ptr, size);
+  char * aligned = (char *)ALIGN_TO((size_t)ptr, size);
   munmap(ptr, aligned-ptr);
   munmap(aligned+size, ptr+size-aligned);
   return aligned;
